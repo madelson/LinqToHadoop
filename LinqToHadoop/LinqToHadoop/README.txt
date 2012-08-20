@@ -24,6 +24,8 @@ Keys and values are broken into fields. The encoders have Read/Write methods for
 
 * To handle maps/lists, BeginCollection(type, size)
 
+Serializer library generates a (de)serializer for type KeyValuePair<TKey, TValue>
+
 Text encoding:
 keys:
 the separator is replaced with itself -1 (can't be zero :)) + the last char, and the last char is replaced with itself twice

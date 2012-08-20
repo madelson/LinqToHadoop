@@ -5,7 +5,7 @@ using System.Linq.Expressions;
 using System.Text;
 using System.Reflection;
 
-namespace LinqToHadoop.Utilities
+namespace LinqToHadoop
 {
     public static class Helpers
     {
@@ -13,6 +13,14 @@ namespace LinqToHadoop.Utilities
         {
             var methodCallExpression = (MethodCallExpression)methodCall.Body;
             return methodCallExpression.Method;
+        }
+
+        public static int GetHashCode<T>(T obj)
+        {
+            var hash = obj != null
+                ? obj.GetHashCode()
+                : 0;
+            return hash;
         }
     }
 }

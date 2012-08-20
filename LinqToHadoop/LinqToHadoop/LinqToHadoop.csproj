@@ -41,11 +41,14 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Compiler\LinqToHadoopQueryOperators.cs" />
+    <Compile Include="Compiler\OneOf.cs" />
     <Compile Include="Compiler\QueryCompiler.cs" />
     <Compile Include="Entities\IParseable.cs" />
     <Compile Include="ILinqToHadoopContext.cs" />
+    <Compile Include="IO\Escaper.cs" />
     <Compile Include="IO\IDecoder.cs" />
     <Compile Include="IO\IEncoder.cs" />
+    <Compile Include="IO\Interfaces.cs" />
     <Compile Include="IO\IoType.cs" />
     <Compile Include="IO\TextEncoding.cs" />
     <Compile Include="MapReduce\Mapper.cs" />
@@ -57,10 +60,13 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Query\HadoopQueryProvider.cs" />
     <Compile Include="Throw.cs" />
-    <Compile Include="Utilities\Helpers.cs" />
+    <Compile Include="Helpers.cs" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="README.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Utilities\" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
