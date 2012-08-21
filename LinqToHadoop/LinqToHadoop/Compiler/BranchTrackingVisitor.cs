@@ -6,12 +6,14 @@ using System.Linq.Expressions;
 
 namespace LinqToHadoop.Compiler
 {
-    class BranchTrackingVisitor : ExpressionVisitor
+    /// <summary>
+    /// A visitor which provides access to a path value along the way
+    /// </summary>
+    public class BranchTrackingVisitor : ExpressionVisitor
     {
         public const string PathSeparator = "/";
 
-        private readonly Stack<int> _path = new Stack<int>();
-        private readonly List<int> _claimedBranchIdsByDepth = new List<int>();
+        private readonly List<int> _path = new List<int> { -1 };
 
         public BranchTrackingVisitor()
         {
@@ -23,40 +25,41 @@ namespace LinqToHadoop.Compiler
         protected int Depth { get; private set; }
         protected string Path 
         { 
-            get { return string.Join(PathSeparator, this._claimedBranchIdsByDepth.Take(this.Depth).Select(i => (char)('0' + i))); } 
+            get { return string.Join(PathSeparator, this._path.Take(this.Depth + 1).Select(i => (char)('0' + i))); } 
         }
 
         public override Expression Visit(Expression node)
         {
-            //Throw.InvalidIf(this.IsFinished, "The visitor cannot be re-used!");
+            Throw.InvalidIf(this.IsFinished, "The visitor cannot be re-used!");
 
             // MA not sure why this gets called with null, but it seems to sometimes
             if (node == null)
             {
-                Console.WriteLine("Saw null");
                 return null;
             }
 
+            // increment depth
             this.Depth++;
 
-            // ensure that we have a counter for that depth
-            if (this._claimedBranchIdsByDepth.Count <= this.Depth)
-            {
-                this._claimedBranchIdsByDepth.Add(-1);
-            }
-            this._claimedBranchIdsByDepth[this.Depth]++;
-            
-            // reset all counters at greater depth than current
-            for (var i = this.Depth + 1; i < this._claimedBranchIdsByDepth.Count; ++i)
-            {
-                this._claimedBranchIdsByDepth[i] = -1;
-            }
+            // increment the counter at the current depth
+            this._path[this.Depth]++;
 
-            Console.WriteLine(this.Path + ": " + node);
+            // prepare a new counter for the children of this node
+            this._path.Add(-1);
+
             var result = this.VisitImpl(node);
 
+            // pop the child counter
+            this._path.RemoveAt(this.Depth + 1);
+
+            // we don't decrement the counter at the current depth because we want
+            // siblings to use it
+
+            // decrement depth
             this.Depth--;
-            if (this.Depth == 0)
+            
+            // when we get back to a depth of -1, we're back at the start
+            if (this.Depth < 0)
             {
                 this.IsFinished = true;
             }
@@ -64,6 +67,9 @@ namespace LinqToHadoop.Compiler
             return result;
         }
 
+        /// <summary>
+        /// This should be overriden by subclasses if they want special behavior on Visit
+        /// </summary>
         protected virtual Expression VisitImpl(Expression node)
         {
             return base.Visit(node);

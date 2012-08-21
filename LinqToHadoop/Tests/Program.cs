@@ -41,7 +41,7 @@ namespace Tests
 
             if (failedTests.Any()) 
             {
-                Console.WriteLine("{0} tests failed!", failedTests.Count);
+                Console.WriteLine("{0} test(s) failed!", failedTests.Count);
                 failedTests.ForEach(Console.WriteLine);
             }
             else 
