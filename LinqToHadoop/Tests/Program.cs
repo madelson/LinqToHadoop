@@ -15,11 +15,13 @@ namespace Tests
         {
             var tests = new Dictionary<string, Action> {
                 { "EncodingTest", () => EncodingTests.RunAll() },
+                { "BranchTrackingVisitorTest", () => BranchTrackingVisitorTests.RunAll() },
                 { "QueryCompilerTest", () => QueryCompilerTest.RunAll() },
             };
 
             Console.WriteLine("Running all tests");
             var fullStart = DateTime.Now;
+            var failedTests = new List<string>();
             foreach (var test in tests)
             {
                 var start = DateTime.Now;
@@ -31,9 +33,20 @@ namespace Tests
                 }
                 catch (Exception ex)
                 {
+                    failedTests.Add(test.Key);
                     Console.WriteLine("Failure! " + ex);
                 }
                 Console.WriteLine();
+            }
+
+            if (failedTests.Any()) 
+            {
+                Console.WriteLine("{0} tests failed!", failedTests.Count);
+                failedTests.ForEach(Console.WriteLine);
+            }
+            else 
+            {
+                Console.WriteLine("All tests succeeded!");
             }
 
             Console.ReadKey();
