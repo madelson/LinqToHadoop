@@ -6,6 +6,7 @@ using LinqToHadoop;
 using LinqToHadoop.Compiler;
 using Tests.Compiler;
 using Tests.IO;
+using Tests.Reflection;
 
 namespace Tests
 {
@@ -17,6 +18,7 @@ namespace Tests
                 { "EncodingTest", () => EncodingTests.RunAll() },
                 { "BranchTrackingVisitorTest", () => BranchTrackingVisitorTests.RunAll() },
                 { "QueryCompilerTest", () => QueryCompilerTest.RunAll() },
+                { "ReflectionTest", () => ReflectionTests.RunAll() },
             };
 
             Console.WriteLine("Running all tests");

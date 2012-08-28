@@ -17,6 +17,7 @@ namespace Tests.Compiler
                 .SelectMany(s => s)
                 .GroupBy(ch => char.IsDigit(ch))
                 .Take(1)
+                .Map(gs => gs.Select(g => new KeyValuePair<int, int>(1, 1)))
                 .Expression;
             Test(exp1, d => d.First(kvp => kvp.Key is MethodCallExpression && ((MethodCallExpression)kvp.Key).Method.Name == "GroupBy")
                 .Value.ShouldEqual("0/0"));
