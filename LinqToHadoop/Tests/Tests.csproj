@@ -44,6 +44,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Compiler\BranchTrackingVisitorTests.cs" />
+    <Compile Include="Compiler\CompilerTests.cs" />
     <Compile Include="Compiler\QueryCompilerTest.cs" />
     <Compile Include="IO\EncodingTests.cs" />
     <Compile Include="IO\SerializationTests.cs" />

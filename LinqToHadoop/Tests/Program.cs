@@ -16,8 +16,7 @@ namespace Tests
         {
             var tests = new Dictionary<string, Action> {
                 { "EncodingTest", () => EncodingTests.RunAll() },
-                { "BranchTrackingVisitorTest", () => BranchTrackingVisitorTests.RunAll() },
-                { "QueryCompilerTest", () => QueryCompilerTest.RunAll() },
+                { "CompilerTest", () => CompilerTests.RunAll() },
                 { "ReflectionTest", () => ReflectionTests.RunAll() },
                 { "SerializationTest", () => SerializationTests.RunAll() },
             };
