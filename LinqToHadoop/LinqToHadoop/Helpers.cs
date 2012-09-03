@@ -17,12 +17,17 @@ namespace LinqToHadoop
             return methodCallExpression.Method;
         }
 
-        public static MethodCallExpression Call(this MethodInfo @this, Expression instanceOrFirstParameter, params Expression[] parameters)
+        public static PropertyInfo Property<TProperty>(Expression<Func<TProperty>> propertyAccess)
+        {
+            var propertyExpression = (MemberExpression)propertyAccess.Body;
+            return (PropertyInfo)propertyExpression.Member;
+        }
+
+        public static MethodCallExpression Call(this MethodInfo @this, Expression instanceOrFirstParameter = null, params Expression[] parameters)
         {
             var parametersToUse = !@this.IsStatic
                 ? parameters
-                : new[] { instanceOrFirstParameter }.Concat(parameters)
-                    .Where(e => e != null);
+                : new[] { instanceOrFirstParameter }.Where(e => e != null).Concat(parameters);
             var expression = Expression.Call(
                 instance: !@this.IsStatic ? instanceOrFirstParameter : null,
                 method: @this.IsGenericMethod
@@ -31,6 +36,21 @@ namespace LinqToHadoop
                 arguments: parametersToUse
             );
             return expression;
+        }
+
+        public static object InferGenericsAndInvoke(this MethodInfo @this, object instanceOrFirstParameter = null, params object[] parameters)
+        {
+            var parametersToUse = !@this.IsStatic
+                ? parameters
+                : new[] { instanceOrFirstParameter }.Where(e => e != null).Concat(parameters);
+            var method = @this.IsGenericMethod
+                ? @this.MakeGenericMethodFromParameters(parametersToUse.Select(e => e.GetType()).ToList())
+                : @this;
+            var result = @this.Invoke(
+                obj: !@this.IsStatic ? instanceOrFirstParameter : null,
+                parameters: parametersToUse.ToArray()
+            );
+            return result;
         }
 
         public static int GetHashCode<T>(T obj)
@@ -49,6 +69,36 @@ namespace LinqToHadoop
                 && (@this.Name.StartsWith("<>") || @this.Name.StartsWith("VB$"))
                 && (@this.Attributes & TypeAttributes.NotPublic) == TypeAttributes.NotPublic;
             return true;
+        }
+
+        public static KeyValuePair<TKey, TValue> WithValue<TKey, TValue>(this TKey @this, TValue value)
+        {
+            return new KeyValuePair<TKey, TValue>(@this, value);
+        }
+
+        public static KeyValuePair<TKey, TValue> WithKey<TKey, TValue>(this TValue @this, TKey key)
+        {
+            return key.WithValue(@this);
+        }
+
+        public static bool IsGenericOfType(this Type type, Type genericTypeDefinition)
+        {
+            Throw.If(!genericTypeDefinition.IsGenericTypeDefinition, "generic type definition required");
+
+            if (type.IsGenericType && type.GetGenericTypeDefinition() == genericTypeDefinition)
+            {
+                return true;
+            }
+            if (genericTypeDefinition.IsInterface && type.GetInterfaces().Any(i => i.IsGenericOfType(genericTypeDefinition))) 
+            {
+                return true;
+            }
+            if (type.BaseType != null && type.BaseType != typeof(object))
+            {
+                return type.BaseType.IsGenericOfType(genericTypeDefinition);
+            }
+
+            return false;
         }
     }
 }
