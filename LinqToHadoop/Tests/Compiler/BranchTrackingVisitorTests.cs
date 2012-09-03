@@ -40,6 +40,9 @@ namespace Tests.Compiler
             var sortedPaths = vis.paths.OrderBy(s => s);
             sortedPaths.SequenceEqual(vis.paths).Assert();
 
+            vis.paths.Skip(1).All(p => Visitor.IsXChildOfY(p, vis.paths[0]) && !Visitor.IsXChildOfY(vis.paths[0], p))
+                .Assert();
+
             if (additionalCheck != null)
             {
                 additionalCheck(vis.pathsDict);
