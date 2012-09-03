@@ -19,6 +19,7 @@ namespace Tests
                 { "BranchTrackingVisitorTest", () => BranchTrackingVisitorTests.RunAll() },
                 { "QueryCompilerTest", () => QueryCompilerTest.RunAll() },
                 { "ReflectionTest", () => ReflectionTests.RunAll() },
+                { "SerializationTest", () => SerializationTests.RunAll() },
             };
 
             Console.WriteLine("Running all tests");

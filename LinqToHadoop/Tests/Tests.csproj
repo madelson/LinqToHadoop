@@ -46,6 +46,7 @@
     <Compile Include="Compiler\BranchTrackingVisitorTests.cs" />
     <Compile Include="Compiler\QueryCompilerTest.cs" />
     <Compile Include="IO\EncodingTests.cs" />
+    <Compile Include="IO\SerializationTests.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Reflection\ReflectionTests.cs" />
@@ -56,6 +57,9 @@
       <Project>{C03E2EC8-A79D-4C33-8DC8-3E40627F6E8C}</Project>
       <Name>LinqToHadoop</Name>
     </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Integration\" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
