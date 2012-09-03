@@ -74,5 +74,11 @@ namespace LinqToHadoop.Compiler
         {
             return base.Visit(node);
         }
+
+        public static bool IsXChildOfY(string x, string y)
+        {
+            var isXChildOfY = x.StartsWith(y) && x != y;
+            return isXChildOfY;
+        }
     }
 }
