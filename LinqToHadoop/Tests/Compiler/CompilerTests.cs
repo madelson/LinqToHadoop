@@ -35,10 +35,22 @@ namespace Tests.Compiler
             var result1 = query.ToList();
             var inlined = CompileInliner.ProcessExpression(query.Expression);
             (!Equals(inlined, query.Expression)).Assert();
+            new CompileFinder().Visit(inlined);
+
             var query2 = query.Provider.CreateQuery<T>(inlined);
             var result2 = query2.ToList();
 
             result2.SequenceEqual(result1).Assert();
+        }
+
+        private class CompileFinder : ExpressionVisitor
+        {
+            protected override Expression VisitMethodCall(MethodCallExpression node)
+            {
+                Throw.If(node.Method.Name == "Compile" && node.Method.DeclaringType.Is(typeof(LambdaExpression)), "Found Compile call!");
+
+                return base.VisitMethodCall(node);
+            }
         }
     }
 }
