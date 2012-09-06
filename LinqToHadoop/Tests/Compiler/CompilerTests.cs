@@ -16,6 +16,7 @@ namespace Tests.Compiler
             BranchTrackingVisitorTests.RunAll();
             QueryCompilerTest.RunAll();
             TestCompilerInliner();
+            TestExpressionHelpers();
         }
 
         public static void TestCompilerInliner()
@@ -41,6 +42,51 @@ namespace Tests.Compiler
             var result2 = query2.ToList();
 
             result2.SequenceEqual(result1).Assert();
+        }
+
+        public static void TestExpressionHelpers()
+        {
+            TestForLoop();
+            TestForEachLoop();
+        }
+
+        private static void TestForLoop()
+        {
+            var list = new List<int>();
+            Expression<Action<int>> add = i => list.Add(i);
+
+            var forLoop = ExpressionHelpers.ForLoop(
+                bodyFactory: (i, label) => Expression.Invoke(add, i),
+                startAt: Expression.Constant(3),
+                incrementBy: Expression.Constant(2),
+                stopAt: Expression.Constant(11)
+            );
+
+            var runForLoop = Expression.Lambda<Action>(forLoop);
+            var runForLoopAction = runForLoop.Compile();
+            
+            runForLoopAction();
+            list.SequenceEqual(new[] { 3, 5, 7, 9 }).Assert();
+
+            runForLoopAction();
+            list.SequenceEqual(new[] { 3, 5, 7, 9, 3, 5, 7, 9 }).Assert();
+        }
+
+        private static void TestForEachLoop()
+        {
+            var list = new List<string> { "a", "bb", "", "cab" };
+            var outList = new List<int>();
+            Expression<Action<string, int>> addLengthAndIndex = (s, i) => outList.AddRange(new[] { s.Length, i });
+
+            var forEachLoop = ExpressionHelpers.ForEachLoop(
+                enumerable: Expression.Constant(list),
+                bodyFactory: (element, index, label) => Expression.Invoke(addLengthAndIndex, element, index)
+            );
+            var runLoop = Expression.Lambda<Action>(forEachLoop);
+            var runLoopAction = runLoop.Compile();
+
+            runLoopAction();
+            outList.SequenceEqual(new[] { 1, 0, 2, 1, 0, 2, 3, 3 }).Assert();
         }
 
         private class CompileFinder : ExpressionVisitor

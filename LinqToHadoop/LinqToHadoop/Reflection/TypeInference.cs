@@ -7,6 +7,11 @@ using System.Collections.Concurrent;
 
 namespace LinqToHadoop.Reflection
 {
+    // TODOS:
+    // support inference by instance, return type, not just parameters
+    // find and try all inference paths, not just the shortest ones
+    // use GetGenericArguments(type<>) throughout
+    // full array support
     public static class TypeInference
     {
         private static readonly ConcurrentDictionary<MethodInfo, InferenceStrategy> InferenceStrategyCache = new ConcurrentDictionary<MethodInfo, InferenceStrategy>();
