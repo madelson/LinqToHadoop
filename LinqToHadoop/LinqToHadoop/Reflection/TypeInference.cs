@@ -39,7 +39,8 @@ namespace LinqToHadoop.Reflection
                 Type typeToExamine = argumentTypes[inferencePath[0]];
                 foreach (var i in inferencePath.Skip(1))
                 {
-                    typeToExamine = typeToExamine.GetGenericArguments()[i];
+                    // TODO this should probably use GetGenericArguments(typedef)
+                    typeToExamine = GetGenericOrArrayArguments(typeToExamine)[i];
                 }
 
                 return typeToExamine;
@@ -81,7 +82,7 @@ namespace LinqToHadoop.Reflection
                 // recurse
                 if (parameterType.IsGenericType)
                 {
-                    var parameterGenericArguments = parameterType.GetGenericArguments();
+                    var parameterGenericArguments = GetGenericOrArrayArguments(parameterType);
                     for (var i = 0; i < parameterGenericArguments.Length; ++i)
                     {
                         currentPath.Push(i);
@@ -89,6 +90,13 @@ namespace LinqToHadoop.Reflection
                         currentPath.Pop();
                     }
                 }
+            }
+
+            private static Type[] GetGenericOrArrayArguments(Type type)
+            {
+                return type.IsArray
+                    ? new[] { type.GetElementType() }
+                    : type.GetGenericArguments();
             }
         }
     }

@@ -11,7 +11,15 @@ namespace LinqToHadoop
 {
     public static class Helpers
     {
+        public static readonly object[] EmptyArgs = new object[0];
+
         public static MethodInfo Method<T>(Expression<Action<T>> methodCall)
+        {
+            var methodCallExpression = (MethodCallExpression)methodCall.Body;
+            return methodCallExpression.Method;
+        }
+
+        public static MethodInfo Method(Expression<Action> methodCall)
         {
             var methodCallExpression = (MethodCallExpression)methodCall.Body;
             return methodCallExpression.Method;
@@ -81,24 +89,49 @@ namespace LinqToHadoop
             return key.WithValue(@this);
         }
 
-        public static bool IsGenericOfType(this Type type, Type genericTypeDefinition)
+        public static Type[] GetGenericArguments(this Type @this, Type genericTypeDefinition)
         {
             Throw.If(!genericTypeDefinition.IsGenericTypeDefinition, "generic type definition required");
 
-            if (type.IsGenericType && type.GetGenericTypeDefinition() == genericTypeDefinition)
+            // if @this directly matches, use it's type arguments
+            if (@this.IsGenericType && @this.GetGenericTypeDefinition() == genericTypeDefinition)
             {
-                return true;
-            }
-            if (genericTypeDefinition.IsInterface && type.GetInterfaces().Any(i => i.IsGenericOfType(genericTypeDefinition))) 
-            {
-                return true;
-            }
-            if (type.BaseType != null && type.BaseType != typeof(object))
-            {
-                return type.BaseType.IsGenericOfType(genericTypeDefinition);
+                var arguments = @this.GetGenericArguments();
+                return arguments;
             }
 
-            return false;
+            // if any interfaces match, use the matching interface
+            if (genericTypeDefinition.IsInterface)
+            {
+                var matchingInterfaceArguments = @this.GetInterfaces()
+                    .Select(i => i.GetGenericArguments(genericTypeDefinition))
+                    .FirstOrDefault(a => a.Length > 0);
+                if (matchingInterfaceArguments != null)
+                {
+                    return matchingInterfaceArguments;
+                }
+            }
+
+            // finally, check the base type if we have one
+            if (@this.BaseType != null && @this.BaseType != typeof(object))
+            {
+                return @this.BaseType.GetGenericArguments(genericTypeDefinition);
+            }
+
+            // otherwise, failure
+            return Type.EmptyTypes;
+        }
+
+        public static bool IsGenericOfType(this Type @this, Type genericTypeDefinition)
+        {
+            var arguments = @this.GetGenericArguments(genericTypeDefinition);
+            return arguments.Length > 0;
+        }
+
+        public static bool Is(this Type @this, Type that)
+        {
+            var isThisAThat = that.IsAssignableFrom(@this);
+            return isThisAThat;
         }
     }
 }
