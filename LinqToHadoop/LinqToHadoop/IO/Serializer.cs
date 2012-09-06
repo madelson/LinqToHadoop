@@ -62,10 +62,16 @@ namespace LinqToHadoop.IO
                 var writeElementExpression = (LambdaExpression)SerializerHelpers.GetExpressionMethod
                     .MakeGenericMethod(enumerableElementType)
                     .Invoke(null, Helpers.EmptyArgs);
-                var writeAllElementsExpression = SerializerHelpers.WriteCollectionElementsMethod.Call(
-                    enumerableTParameter,
-                    writerParameter,
-                    Expression.Constant(writeElementExpression.Compile())
+                // this works, but requires a lot of independently compiled expressions. I'm going for a hard-coded foreach loop
+                // instead. Not compiling the expression does something even weirder: I get weird NullReferenceExceptions!
+                //var writeAllElementsExpression = SerializerHelpers.WriteCollectionElementsMethod.Call(
+                //    enumerableTParameter,
+                //    writerParameter,
+                //    Expression.Constant(writeElementExpression.Compile())
+                //);
+                var writeAllElementsExpression = ExpressionHelpers.ForEachLoop(
+                    enumerable: enumerableTParameter,
+                    bodyFactory: (element, index, label) => Expression.Invoke(writeElementExpression, writerParameter, element)
                 );
 
                 // return the two generated expressions in sequence

@@ -44,7 +44,7 @@ namespace Tests.IO
             results = TestSerialize(new { a = new[] { 20, 10 }, b = 2 });
             results.SequenceEqual(new object[] { 2, 20, 10, 2 }).Assert();
 
-            results = TestSerialize(new { dict = new Dictionary<string, int[]> { { "s", new[] { 20, 10 } } }, b = new { "abc".Length } });
+            results = TestSerialize(new { dict = new Dictionary<string, int[]> { { "s", new[] { 20, 10 } } }, dictX = new { "abc".Length } });
             results.SequenceEqual(new object[] { 1, "s", 2, 20, 10, 3 })
                 .Assert();
         }
