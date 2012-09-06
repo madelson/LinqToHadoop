@@ -5,6 +5,7 @@ using System.Text;
 using System.Linq.Expressions;
 using System.Reflection;
 using LinqToHadoop.Entities;
+using LinqToHadoop.Compiler;
 
 namespace LinqToHadoop.IO
 {
@@ -43,9 +44,35 @@ namespace LinqToHadoop.IO
             }
 
             // for collections, we call BeginWritingCollection and then write each element
-            if (typeof(T).IsGenericOfType(typeof(IEnumerable<>)))
+            var enumerableElementType = typeof(T).GetGenericArguments(typeof(IEnumerable<>)).SingleOrDefault();
+            if (enumerableElementType != null)
             {
+                // for type inference to work properly, cast to IEnumerable so the expression must be a generic type (rather than T[])
+                var enumerableTParameter = Expression.Convert(tParameter, typeof(IEnumerable<>).MakeGenericType(enumerableElementType));
 
+                // create an expression for writing the collection header (basically, the count
+                Expression<Action<IWriter, int>> callBeginWritingCollection = (w, count) => w.BeginWritingCollection(count);
+                var beginWritingCollection = Expression.Invoke(
+                    callBeginWritingCollection,
+                    writerParameter,
+                    Helpers.Method(() => Enumerable.Count<int>(null)).Call(enumerableTParameter)
+                );
+
+                // create an expression for looping over all elements in the collection and writing them out
+                var writeElementExpression = (LambdaExpression)SerializerHelpers.GetExpressionMethod
+                    .MakeGenericMethod(enumerableElementType)
+                    .Invoke(null, Helpers.EmptyArgs);
+                var writeAllElementsExpression = SerializerHelpers.WriteCollectionElementsMethod.Call(
+                    enumerableTParameter,
+                    writerParameter,
+                    Expression.Constant(writeElementExpression.Compile())
+                );
+
+                // return the two generated expressions in sequence
+                return Expression.Block(
+                    beginWritingCollection,
+                    writeAllElementsExpression
+                );
             }
 
             // otherwise, write out all properties
@@ -59,7 +86,7 @@ namespace LinqToHadoop.IO
                 // get the write expression
                 var writeExpression = (Expression)SerializerHelpers.GetExpressionMethod
                     .MakeGenericMethod(pi.PropertyType)
-                    .Invoke(null, Type.EmptyTypes);
+                    .Invoke(null, Helpers.EmptyArgs);
                 
                 // create the combined expression to write the value
                 var writePropertyExpression = Expression.Invoke(writeExpression, writerParameter, propertyValue);
@@ -89,12 +116,23 @@ namespace LinqToHadoop.IO
 
     internal static class SerializerHelpers
     {
-        internal static readonly MethodInfo GetExpressionMethod = Helpers.Method<object>(_ => SerializerHelpers.GetExpression<int>())
-            .GetGenericMethodDefinition();
+        internal static readonly MethodInfo GetExpressionMethod = Helpers.Method(() => SerializerHelpers.GetExpression<int>())
+                .GetGenericMethodDefinition(),
+            WriteCollectionElementsMethod = Helpers.Method(() => SerializerHelpers.WriteCollectionElements<int>(null, null, null)),
+            CountMethod = Helpers.Method(() => Enumerable.Count(string.Empty))
+                .GetGenericMethodDefinition();
 
         private static Expression<Action<IWriter, T>> GetExpression<T>()
         {
             return Serializer<T>.WriteExpression;
+        }
+
+        private static void WriteCollectionElements<T>(IEnumerable<T> collection, IWriter writer, Action<IWriter, T> writeAction)
+        {
+            foreach (var element in collection)
+            {
+                writeAction(writer, element);
+            }
         }
     }
 }

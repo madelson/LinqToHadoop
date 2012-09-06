@@ -10,11 +10,42 @@ namespace Tests.IO
     {
         public static void RunAll()
         {
+            TestSerializer();
+        }
+
+        public static void TestSerializer()
+        {
             var results = TestSerialize(5);
             results.Single().ShouldEqual(5);
 
             results = TestSerialize(new { a = DateTime.MinValue, b = "hi" });
             results.SequenceEqual(new object[] { DateTime.MinValue, "hi" })
+                .Assert();
+
+            results = TestSerialize(new[] { 1, 2, 3, 4 });
+            results.SequenceEqual(new object[] { 4, 1, 2, 3, 4 })
+                .Assert();
+
+            results = TestSerialize(new { a = new { b = 1, c = 2 }, d = 3 });
+            results.SequenceEqual(new object[] { 1, 2, 3 }).Assert();
+
+            results = TestSerialize(new Dictionary<string, int> { { "x", 7 } });
+            results.SequenceEqual(new object[] { 1, "x", 7 }).Assert();
+
+            results = TestSerialize(new List<int[]> { new[] { 7, 8 }, new[] { 70, 80 } });
+            results.SequenceEqual(new object[] { 2, 2, 7, 8, 2, 70, 80 }).Assert();
+
+            results = TestSerialize(new Dictionary<string, int[]> { { "s", new[] { 20, 10 } } });
+            results.SequenceEqual(new object[] { 1, "s", 2, 20, 10 }).Assert();
+
+            results = TestSerialize(new { "abc".Length });
+            results.SequenceEqual(new object[] { 3 }).Assert();
+
+            results = TestSerialize(new { a = new[] { 20, 10 }, b = 2 });
+            results.SequenceEqual(new object[] { 2, 20, 10, 2 }).Assert();
+
+            results = TestSerialize(new { dict = new Dictionary<string, int[]> { { "s", new[] { 20, 10 } } }, b = new { "abc".Length } });
+            results.SequenceEqual(new object[] { 1, "s", 2, 20, 10, 3 })
                 .Assert();
         }
 
@@ -42,7 +73,7 @@ namespace Tests.IO
 
             public void BeginWritingCollection(int count)
             {
-                throw new NotImplementedException();
+                this.Objects.Add(count);
             }
 
             public void WriteByte(byte value)
