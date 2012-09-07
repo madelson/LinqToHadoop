@@ -15,11 +15,13 @@ namespace Tests
         static void Main(string[] args)
         {
             var tests = new Dictionary<string, Action> {
-                { "EncodingTest", () => EncodingTests.RunAll() },
-                { "CompilerTest", () => CompilerTests.RunAll() },
-                { "ReflectionTest", () => ReflectionTests.RunAll() },
-                { "SerializationTest", () => SerializationTests.RunAll() },
-            };
+                    { "EncodingTest", () => EncodingTests.RunAll() },
+                    { "CompilerTest", () => CompilerTests.RunAll() },
+                    { "ReflectionTest", () => ReflectionTests.RunAll() },
+                    { "SerializationTest", () => SerializationTests.RunAll() },
+                }
+                .OrderBy(kvp => kvp.Key)
+                .ToList();
 
             Console.WriteLine("Running all tests");
             var fullStart = DateTime.Now;

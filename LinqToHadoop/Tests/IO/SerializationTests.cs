@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using LinqToHadoop;
 using LinqToHadoop.IO;
 
 namespace Tests.IO
@@ -47,6 +48,13 @@ namespace Tests.IO
             results = TestSerialize(new { dict = new Dictionary<string, int[]> { { "s", new[] { 20, 10 } } }, dictX = new { "abc".Length } });
             results.SequenceEqual(new object[] { 1, "s", 2, 20, 10, 3 })
                 .Assert();
+
+            // bulk write
+            var aLot = Enumerable.Range(0, 10000).Select(i => (i * i).WithValue(i.ToString())).ToList();
+            var serializer = Serializer<KeyValuePair<int, string>>.WriteExpression.Compile();
+            var writer = new ListWriter();
+            aLot.ForEach(kvp => serializer(writer, kvp));
+            writer.Objects.Count.ShouldEqual(aLot.Count * 2);
         }
 
         public static List<object> TestSerialize<T>(T value)

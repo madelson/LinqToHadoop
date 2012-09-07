@@ -10,35 +10,35 @@ using LinqToHadoop.Compiler;
 namespace LinqToHadoop.IO
 {
     /// <summary>
-    /// A class for writing values of a given type to an IWriter
+    /// A class for reading values given an IReader
     /// </summary>
-    public class Serializer<T>
+    public class Deserializer<T>
     {
-        private static readonly Expression<Action<IWriter, T>> _writeExpression;
+        private static readonly Expression<Action<IReader, T>> _readExpression;
 
-        public static Expression<Action<IWriter, T>> WriteExpression { get { return _writeExpression; } }
+        public static Expression<Action<IReader, T>> ReadExpression { get { return _readExpression; } }
 
-        static Serializer()
+        static Deserializer()
         {
-            var writerParameter = Expression.Parameter(typeof(IWriter), "writer");
+            var readerParameter = Expression.Parameter(typeof(IReader), "writer");
             var tParameter = Expression.Parameter(typeof(T), "t");
-            var body = CreateWriteExpressionBody(writerParameter, tParameter);
-            var lambda = Expression.Lambda<Action<IWriter, T>>(body, writerParameter, tParameter);
-            Serializer<T>._writeExpression = lambda;
+            var body = CreateReadExpressionBody(readerParameter, tParameter);
+            var lambda = Expression.Lambda<Action<IReader, T>>(body, readerParameter, tParameter);
+            Deserializer<T>._readExpression = lambda;
         }
 
-        private static Expression CreateWriteExpressionBody(ParameterExpression writerParameter, ParameterExpression tParameter)
+        private static Expression CreateReadExpressionBody(ParameterExpression readerParameter, ParameterExpression tParameter)
         {
-            // first check if there is a direct write method for this type
-            var method = GetWriteMethod(typeof(T));
+            // first check if there is a direct read method for this type
+            var method = GetReadMethod(typeof(T));
             if (method != null)
             {
-                var methodCall = Expression.Call(writerParameter, method, tParameter);
+                var methodCall = Expression.Call(readerParameter, method, tParameter);
                 return methodCall;
             }
 
             // for the none type, just do nothing!
-            if (typeof(T) == typeof(None)) 
+            if (typeof(T) == typeof(None))
             {
                 return Expression.Empty();
             }
@@ -54,10 +54,10 @@ namespace LinqToHadoop.IO
                 Expression<Action<IWriter, int>> callBeginWritingCollection = (w, count) => w.BeginWritingCollection(count);
                 var beginWritingCollection = Expression.Invoke(
                     callBeginWritingCollection,
-                    writerParameter,
+                    readerParameter,
                     Helpers.Method(() => Enumerable.Count<int>(null)).Call(enumerableTParameter)
                 );
-                
+
                 // create an expression for looping over all elements in the collection and writing them out
                 var writeElementExpression = SerializationHelpers.GetSerializerExpression(enumerableElementType);
                 // this works, but requires a lot of independently compiled expressions. I'm going for a hard-coded foreach loop
@@ -69,7 +69,7 @@ namespace LinqToHadoop.IO
                 //);
                 var writeAllElementsExpression = ExpressionHelpers.ForEachLoop(
                     enumerable: enumerableTParameter,
-                    bodyFactory: (element, index, label) => Expression.Invoke(writeElementExpression, writerParameter, element)
+                    bodyFactory: (element, index, label) => Expression.Invoke(writeElementExpression, readerParameter, element)
                 );
 
                 // return the two generated expressions in sequence
@@ -89,9 +89,9 @@ namespace LinqToHadoop.IO
 
                 // get the write expression
                 var writeExpression = SerializationHelpers.GetSerializerExpression(pi.PropertyType);
-                
+
                 // create the combined expression to write the value
-                var writePropertyExpression = Expression.Invoke(writeExpression, writerParameter, propertyValue);
+                var writePropertyExpression = Expression.Invoke(writeExpression, readerParameter, propertyValue);
                 expressions.Add(writePropertyExpression);
             }
 
@@ -99,10 +99,10 @@ namespace LinqToHadoop.IO
             return writeAllPropertiesExpression;
         }
 
-        private static MethodInfo GetWriteMethod(Type type)
+        private static MethodInfo GetReadMethod(Type type)
         {
-            return typeof(IWriter).GetMethods()
-                .SingleOrDefault(m => m.Name.StartsWith("Write") && m.GetParameters().Single().ParameterType == type);
+            return typeof(IReader).GetMethods()
+                .SingleOrDefault(m => m.Name.StartsWith("Read") && m.GetParameters().Single().ParameterType == type);
         }
     }
 }

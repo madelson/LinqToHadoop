@@ -53,6 +53,7 @@
     <Compile Include="Entities\IParseable.cs" />
     <Compile Include="Entities\None.cs" />
     <Compile Include="ILinqToHadoopContext.cs" />
+    <Compile Include="IO\Deserializer.cs" />
     <Compile Include="IO\Escaper.cs" />
     <Compile Include="IO\IDecoder.cs" />
     <Compile Include="IO\IEncoder.cs" />
@@ -60,6 +61,7 @@
     <Compile Include="IO\IObjectWriter.cs" />
     <Compile Include="IO\IoType.cs" />
     <Compile Include="IO\Serializer.cs" />
+    <Compile Include="IO\SerializationHelpers.cs" />
     <Compile Include="IO\TextEncoding.cs" />
     <Compile Include="MapReduce\BaseMapReduceJob.cs" />
     <Compile Include="MapReduce\Mapper.cs" />

@@ -14,7 +14,7 @@ namespace Tests.Compiler
         public static void RunAll()
         {
             BranchTrackingVisitorTests.RunAll();
-            QueryCompilerTest.RunAll();
+            //QueryCompilerTest.RunAll();
             TestCompilerInliner();
             TestExpressionHelpers();
         }
