@@ -25,15 +25,15 @@ namespace LinqToHadoop.Compiler
                 {
                     case "Map":
                         var mapper = ExpressionHelpers.UnQuote(node.Arguments[1]);
-                        job = new MapReduceJob(mapExpression: (LambdaExpression)mapper);
+                        job = new MapReduceJob(this.Path, mapExpression: (LambdaExpression)mapper);
                         break;
                     case "Reduce":
                         var reducer = ExpressionHelpers.UnQuote(node.Arguments[1]);
-                        job = new MapReduceJob(reduceExpression: (LambdaExpression)reducer);
+                        job = new MapReduceJob(this.Path, reduceExpression: (LambdaExpression)reducer);
                         break;
                     case "Combine":
                         var combiner = ExpressionHelpers.UnQuote(node.Arguments[1]);
-                        job = new MapReduceJob(combineExpression: (LambdaExpression)combiner);
+                        job = new MapReduceJob(this.Path, combineExpression: (LambdaExpression)combiner);
                         break;
                     default:
                         var method = this.GetType().GetMethod(m.Name, BindingFlags.Instance | BindingFlags.NonPublic);
@@ -43,6 +43,7 @@ namespace LinqToHadoop.Compiler
                 }
 
                 this._jobs[this.Path] = job;
+                return job.OutputParameterExpression;
             }
 
             return base.VisitMethodCall(node);

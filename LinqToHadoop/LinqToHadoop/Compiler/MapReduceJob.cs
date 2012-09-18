@@ -16,6 +16,7 @@ namespace LinqToHadoop.Compiler
             Reduce = 4,
         }
 
+        public ParameterExpression OutputParameterExpression { get; private set; }
         public LambdaExpression MapExpression { get; private set; }
         public LambdaExpression CombineExpression { get; private set; }
         public LambdaExpression ReduceExpression { get; private set; }
@@ -30,14 +31,22 @@ namespace LinqToHadoop.Compiler
             }
         }
 
-        public MapReduceJob(LambdaExpression mapExpression = null,
+        public MapReduceJob(string id,
+                            LambdaExpression mapExpression = null,
                             LambdaExpression combineExpression = null,
                             LambdaExpression reduceExpression = null)
         {
+            Throw.If(id == null, "Must specify an id");
             Throw.If((mapExpression ?? combineExpression ?? reduceExpression) == null, "Must specify at least one phase");
             this.MapExpression = mapExpression;
             this.CombineExpression = combineExpression;
             this.ReduceExpression = reduceExpression;
+
+            var kvpOutputType = (this.ReduceExpression ?? this.CombineExpression ?? this.MapExpression).Body.Type
+                .GetGenericArguments(typeof(IEnumerable<>))
+                .Single();
+            var outputType = typeof(IQueryable<>).MakeGenericType(kvpOutputType);
+            this.OutputParameterExpression = Expression.Parameter(outputType, id);
         }
 
         public bool TryMergeWith(MapReduceJob next, out MapReduceJob combined)
@@ -76,6 +85,7 @@ namespace LinqToHadoop.Compiler
             LambdaExpression reduceExpression)
         {
             var mergedJob = new MapReduceJob(
+                this.OutputParameterExpression.Name + "=>" + next.OutputParameterExpression.Name,
                 mapExpression: mapExpression,
                 combineExpression: combineExpression,
                 reduceExpression: reduceExpression
@@ -85,6 +95,8 @@ namespace LinqToHadoop.Compiler
 
         private static LambdaExpression Merge(LambdaExpression prev, LambdaExpression next)
         {
+            // TODO merge output parameters here
+
             // we can skip the merge if one is null
             if (prev == null || next == null)
             {
