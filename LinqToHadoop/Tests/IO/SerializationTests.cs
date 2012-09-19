@@ -12,6 +12,7 @@ namespace Tests.IO
         public static void RunAll()
         {
             TestSerializer();
+            TestDeserializer();
         }
 
         public static void TestSerializer()
@@ -52,20 +53,36 @@ namespace Tests.IO
             // bulk write
             var aLot = Enumerable.Range(0, 10000).Select(i => (i * i).WithValue(i.ToString())).ToList();
             var serializer = Serializer<KeyValuePair<int, string>>.WriteExpression.Compile();
-            var writer = new ListWriter();
+            var writer = new ListReaderWriter();
             aLot.ForEach(kvp => serializer(writer, kvp));
             writer.Objects.Count.ShouldEqual(aLot.Count * 2);
         }
 
         public static List<object> TestSerialize<T>(T value)
         {
-            var writer = new ListWriter();
+            var writer = new ListReaderWriter();
             var serializer = Serializer<T>.WriteExpression.Compile();
             serializer(writer, value);
             return writer.Objects;
         }
 
-        public class ListWriter : IWriter
+        public static void TestDeserializer()
+        {
+            var kvp = TestDeserialize<KeyValuePair<int, int>>(50, -2);
+            kvp.Key.ShouldEqual(50);
+            kvp.Value.ShouldEqual(50);
+        }
+
+        public static T TestDeserialize<T>(params object[] values)
+        {
+            var reader = new ListReaderWriter();
+            reader.Objects.AddRange(values);
+            var deserializer = Deserializer<T>.ReadExpression.Compile();
+            var result = deserializer(reader);
+            return result;
+        }
+
+        public class ListReaderWriter : IWriter, IReader
         {
             public readonly List<object> Objects = new List<object>();
 
@@ -81,7 +98,7 @@ namespace Tests.IO
 
             public void BeginWritingCollection(int count)
             {
-                this.Objects.Add(count);
+                this.WriteInt(count);
             }
 
             public void WriteByte(byte value)
@@ -121,6 +138,64 @@ namespace Tests.IO
 
             public void Dispose()
             {
+            }
+
+            public void BeginReadingKey()
+            {
+                throw new NotImplementedException();
+            }
+
+            public void BeginReadingValue()
+            {
+                throw new NotImplementedException();
+            }
+
+            public int BeginReadingCollection()
+            {
+                return this.ReadInt();
+            }
+
+            public byte ReadByte()
+            {
+                return this.Consume<byte>();   
+            }
+
+            public char ReadChar()
+            {
+                return this.Consume<char>();
+            }
+
+            public int ReadInt()
+            {
+                return this.Consume<int>();
+            }
+
+            public long ReadLong()
+            {
+                return this.Consume<long>();
+            }
+
+            public double ReadDouble()
+            {
+                return this.Consume<double>();
+            }
+
+            public DateTime ReadDateTime()
+            {
+                return this.Consume<DateTime>();
+            }
+
+            public string ReadString()
+            {
+                return this.Consume<string>();
+            }
+
+            private T Consume<T>()
+            {
+                var value = this.Objects[0];
+                this.Objects.RemoveAt(0);
+
+                return (T)value;
             }
         }
     }

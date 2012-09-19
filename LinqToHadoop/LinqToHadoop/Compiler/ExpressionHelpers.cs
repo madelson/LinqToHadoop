@@ -76,6 +76,8 @@ namespace LinqToHadoop.Compiler
             var startExpression = startAt ?? Expression.Constant(0);
             var incrementExpression = incrementBy ?? Expression.Constant(1);
             var stopAtExpression = stopAt ?? Expression.Constant(0);
+            Throw.If(startExpression.Type != incrementExpression.Type, "Type mismatch between i = X and i += Y");
+            Throw.If(startExpression.Type != stopAtExpression.Type, "Type mismatch between i = X and i <= Y");
 
             var i = Expression.Parameter(typeof(int), "i");
             var label = Expression.Label();

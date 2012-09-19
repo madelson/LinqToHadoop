@@ -14,26 +14,25 @@ namespace LinqToHadoop.IO
     /// </summary>
     public class Deserializer<T>
     {
-        private static readonly Expression<Action<IReader, T>> _readExpression;
+        private static readonly Expression<Func<IReader, T>> _readExpression;
 
-        public static Expression<Action<IReader, T>> ReadExpression { get { return _readExpression; } }
+        public static Expression<Func<IReader, T>> ReadExpression { get { return _readExpression; } }
 
         static Deserializer()
         {
-            var readerParameter = Expression.Parameter(typeof(IReader), "writer");
-            var tParameter = Expression.Parameter(typeof(T), "t");
-            var body = CreateReadExpressionBody(readerParameter, tParameter);
-            var lambda = Expression.Lambda<Action<IReader, T>>(body, readerParameter, tParameter);
+            var readerParameter = Expression.Parameter(typeof(IReader), "reader");
+            var body = CreateReadExpressionBody(readerParameter);
+            var lambda = Expression.Lambda<Func<IReader, T>>(body, readerParameter);
             Deserializer<T>._readExpression = lambda;
         }
 
-        private static Expression CreateReadExpressionBody(ParameterExpression readerParameter, ParameterExpression tParameter)
+        private static Expression CreateReadExpressionBody(ParameterExpression readerParameter)
         {
             // first check if there is a direct read method for this type
             var method = GetReadMethod(typeof(T));
             if (method != null)
             {
-                var methodCall = Expression.Call(readerParameter, method, tParameter);
+                var methodCall = method.Call(readerParameter);
                 return methodCall;
             }
 
@@ -43,66 +42,164 @@ namespace LinqToHadoop.IO
                 return Expression.Empty();
             }
 
-            // for collections, we call BeginWritingCollection and then write each element
+            // for collections, we call BeginReadingCollection and then read each element
             var enumerableElementType = typeof(T).GetGenericArguments(typeof(IEnumerable<>)).SingleOrDefault();
             if (enumerableElementType != null)
             {
-                // for type inference to work properly, cast to IEnumerable so the expression must be a generic type (rather than T[])
-                var enumerableTParameter = Expression.Convert(tParameter, typeof(IEnumerable<>).MakeGenericType(enumerableElementType));
-
-                // create an expression for writing the collection header (basically, the count
-                Expression<Action<IWriter, int>> callBeginWritingCollection = (w, count) => w.BeginWritingCollection(count);
-                var beginWritingCollection = Expression.Invoke(
-                    callBeginWritingCollection,
-                    readerParameter,
-                    Helpers.Method(() => Enumerable.Count<int>(null)).Call(enumerableTParameter)
+                // create an expression for reading the collection header (basically, the count)
+                Expression<Func<IReader, int>> callBeginReadingCollection = r => r.BeginReadingCollection();
+                var beginReadingCollection = Expression.Invoke(
+                    callBeginReadingCollection,
+                    readerParameter
                 );
 
-                // create an expression for looping over all elements in the collection and writing them out
-                var writeElementExpression = SerializationHelpers.GetSerializerExpression(enumerableElementType);
-                // this works, but requires a lot of independently compiled expressions. I'm going for a hard-coded foreach loop
-                // instead. Not compiling the expression does something even weirder: I get weird NullReferenceExceptions!
-                //var writeAllElementsExpression = SerializerHelpers.WriteCollectionElementsMethod.Call(
-                //    enumerableTParameter,
-                //    writerParameter,
-                //    Expression.Constant(writeElementExpression.Compile())
-                //);
-                var writeAllElementsExpression = ExpressionHelpers.ForEachLoop(
-                    enumerable: enumerableTParameter,
-                    bodyFactory: (element, index, label) => Expression.Invoke(writeElementExpression, readerParameter, element)
+                // create expressions for initializing a collection instance and adding to it
+                Func<Expression, Expression> makeCreateExpression;
+                Func<Expression, Expression, Expression, Expression> makeAddExpression;
+                CreateBuilderAndSetterForCollectionType(typeof(T), out makeCreateExpression, out makeAddExpression);
+
+                // create an expression for reading in 1 element of the collection
+                var readElementExpression = SerializationHelpers.GetSerializerExpression(enumerableElementType);
+
+                // create an expression for looping over all elements in the collection and reading them into coll
+                var sizeExpression = Expression.Parameter(typeof(int), "size");
+                var collectionExpression = Expression.Parameter(typeof(T), "collection");
+                var readAllElementsExpression = Expression.Block(
+                    new[] { sizeExpression, collectionExpression },
+                    Expression.Assign(sizeExpression, beginReadingCollection),
+                    Expression.Assign(collectionExpression, makeCreateExpression(sizeExpression)),
+                    ExpressionHelpers.ForLoop(
+                        stopAt: sizeExpression,
+                        bodyFactory: (index, label) => makeAddExpression(
+                            collectionExpression,
+                            Expression.Invoke(readElementExpression, readerParameter),
+                            index
+                        )
+                    )
                 );
 
-                // return the two generated expressions in sequence
-                return Expression.Block(
-                    beginWritingCollection,
-                    writeAllElementsExpression
-                );
+                return readAllElementsExpression;
             }
 
-            // otherwise, write out all properties
+            // read in all properties IN ORDER and store them in local vars
             var props = SerializationHelpers.GetPropertiesToSerialize(typeof(T));
-            var expressions = new List<Expression>();
-            foreach (var pi in props)
-            {
-                // get the expression to read from the property
-                var propertyValue = Expression.MakeMemberAccess(tParameter, pi);
+            var readPropertyExpressions =
+                (from pi in props
+                let readPropertyExpression = SerializationHelpers.GetDeserializerExpression(pi.PropertyType)
+                let param = Expression.Parameter(pi.PropertyType, pi.Name.ToLowerInvariant())
+                let assign = Expression.Assign(param, Expression.Invoke(readPropertyExpression, readerParameter))
+                select new
+                {
+                    Property = pi,
+                    Variable = param,
+                    Assignment = assign
+                })
+                .ToList();
 
-                // get the write expression
-                var writeExpression = SerializationHelpers.GetSerializerExpression(pi.PropertyType);
+            // determine the constructor to use
+            IDictionary<ParameterInfo, PropertyInfo> mapping;
+            var constructor = SerializationHelpers.GetSerializationConstructor(typeof(T), out mapping);
+            
+            // create the read expression
+            var readExpression = Expression.Block(
+                readPropertyExpressions.Select(t => t.Variable),
+                readPropertyExpressions.Select(t => t.Assignment)
+                    .Concat(new Expression[] {
+                        constructor.GetParameters().Any()
+                            // for constructors with parameters, we use mapping to assign a variable value
+                            // to each parameter
+                            ? Expression.New(
+                                constructor,
+                                arguments: constructor.GetParameters()
+                                    .Select(p => readPropertyExpressions.Single(t => t.Property == mapping[p]).Variable)
+                            )
+                            // for default constructors, we do a memberinit (new Model() { A = a, B = b, ... })
+                            : (Expression)Expression.MemberInit(
+                                newExpression: Expression.New(typeof(T)),
+                                bindings: readPropertyExpressions.Select(t => Expression.Bind(t.Property, t.Variable))
+                            )
+                    })
+            );
 
-                // create the combined expression to write the value
-                var writePropertyExpression = Expression.Invoke(writeExpression, readerParameter, propertyValue);
-                expressions.Add(writePropertyExpression);
-            }
-
-            var writeAllPropertiesExpression = Expression.Block(expressions);
-            return writeAllPropertiesExpression;
-        }
+            return null;
+       }
 
         private static MethodInfo GetReadMethod(Type type)
         {
             return typeof(IReader).GetMethods()
-                .SingleOrDefault(m => m.Name.StartsWith("Read") && m.GetParameters().Single().ParameterType == type);
+                .SingleOrDefault(m => m.Name.StartsWith("Read") && m.ReturnType == type);
+        }
+
+        private static void CreateBuilderAndSetterForCollectionType(Type requiredType, out Func<Expression, Expression> makeCreateExpression, out Func<Expression, Expression, Expression, Expression> makeAddExpression)
+        {
+            var elementType = requiredType.GetGenericArguments(typeof(IEnumerable<>)).SingleOrDefault();
+            Throw.If(elementType == null, "An IEnumerable type is required!");
+
+            // the case of T[] is special
+            if (requiredType.IsArray)
+            {
+                makeCreateExpression = size => Expression.NewArrayBounds(elementType, size);
+                makeAddExpression = (array, element, index) => Expression.Assign(Expression.ArrayAccess(array, index), element);
+                return;
+            }
+
+            // get the type definition to use
+            var typeDef = requiredType.GetGenericTypeDefinition();
+            Type typeDefToUse;
+            if (typeDef.IsInterface)
+            {
+                if (typeDef == typeof(IEnumerable<>) || typeDef == typeof(ICollection<>) || typeDef == typeof(IList<>))
+                {
+                    typeDefToUse = typeof(List<>);
+                }
+                else if (typeDef == typeof(IDictionary<,>))
+                {
+                    typeDefToUse = typeof(Dictionary<,>);
+                }
+                else if (typeDef == typeof(ISet<>))
+                {
+                    typeDefToUse = typeof(HashSet<>);
+                }
+                else
+                {
+                    throw Throw.ShouldNeverGetHere("Unsupported collection interface " + typeDef.Name);
+                }
+            }
+            else
+            {
+                typeDefToUse = typeDef;
+            }
+
+            // create a generic type from the definition
+            Type typeToUse;
+            if (typeDefToUse.IsGenericOfType(typeof(IDictionary<,>)))
+            {
+                var kvpTypes = elementType.GetGenericArguments(typeof(KeyValuePair<,>));
+                typeToUse = typeDefToUse.MakeGenericType(kvpTypes);
+            }
+            else
+            {
+                typeToUse = typeDefToUse.MakeGenericType(elementType);
+            }
+            Throw.If(typeToUse.IsAbstract, "Abstract collection type properties are not supported!");            
+
+            // determine which constructor to use for creation (we prefer a capacity constructor if there is one)
+            var constructorToUse = typeToUse.GetConstructors()
+                .Select(c => new { Constructor = c, Parameters = c.GetParameters() })
+                .Where(t => !t.Parameters.Any()
+                    || (t.Parameters.Length == 1 && t.Parameters[0].ParameterType == typeof(int) && t.Parameters[0].Name == "capacity"))
+                .OrderByDescending(t => t.Parameters.Length)
+                .FirstOrDefault();
+            Throw.InvalidIf(constructorToUse == null, "Could not find a default or capacity constructor!");
+
+            // create the two expressions
+            makeCreateExpression = size => Expression.New(constructorToUse.Constructor, constructorToUse.Parameters.Any() ? new[] { size } : Enumerable.Empty<Expression>());
+            makeAddExpression = (collection, element, index) => Helpers.Method<ICollection<int>>(c => c.Add(0)).Call(
+                collection,
+                element
+            );
+
+            throw Throw.ShouldNeverGetHere();
         }
     }
 }
