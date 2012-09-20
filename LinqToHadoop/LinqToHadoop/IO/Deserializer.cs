@@ -39,7 +39,7 @@ namespace LinqToHadoop.IO
             // for the none type, just do nothing!
             if (typeof(T) == typeof(None))
             {
-                return Expression.Empty();
+                return Expression.Constant(None.Instance);
             }
 
             // for collections, we call BeginReadingCollection and then read each element
@@ -47,11 +47,8 @@ namespace LinqToHadoop.IO
             if (enumerableElementType != null)
             {
                 // create an expression for reading the collection header (basically, the count)
-                Expression<Func<IReader, int>> callBeginReadingCollection = r => r.BeginReadingCollection();
-                var beginReadingCollection = Expression.Invoke(
-                    callBeginReadingCollection,
-                    readerParameter
-                );
+                var beginReadingCollection = Helpers.Method<IReader>(r => r.BeginReadingCollection())
+                    .Call(readerParameter);
 
                 // create expressions for initializing a collection instance and adding to it
                 Func<Expression, Expression> makeCreateExpression;
@@ -59,7 +56,7 @@ namespace LinqToHadoop.IO
                 CreateBuilderAndSetterForCollectionType(typeof(T), out makeCreateExpression, out makeAddExpression);
 
                 // create an expression for reading in 1 element of the collection
-                var readElementExpression = SerializationHelpers.GetSerializerExpression(enumerableElementType);
+                var readElementExpression = SerializationHelpers.GetDeserializerExpression(enumerableElementType);
 
                 // create an expression for looping over all elements in the collection and reading them into coll
                 var sizeExpression = Expression.Parameter(typeof(int), "size");
@@ -75,9 +72,10 @@ namespace LinqToHadoop.IO
                             Expression.Invoke(readElementExpression, readerParameter),
                             index
                         )
-                    )
+                    ),
+                    // putting this as the last element of the block "returns" it
+                    collectionExpression
                 );
-
                 return readAllElementsExpression;
             }
 
@@ -105,6 +103,8 @@ namespace LinqToHadoop.IO
                 readPropertyExpressions.Select(t => t.Variable),
                 readPropertyExpressions.Select(t => t.Assignment)
                     .Concat(new Expression[] {
+                        // because the value of a block is the last expression, we can just dump the main deserialization
+                        // expression here
                         constructor.GetParameters().Any()
                             // for constructors with parameters, we use mapping to assign a variable value
                             // to each parameter
@@ -120,8 +120,7 @@ namespace LinqToHadoop.IO
                             )
                     })
             );
-
-            return null;
+            return readExpression;
        }
 
         private static MethodInfo GetReadMethod(Type type)
@@ -194,12 +193,15 @@ namespace LinqToHadoop.IO
 
             // create the two expressions
             makeCreateExpression = size => Expression.New(constructorToUse.Constructor, constructorToUse.Parameters.Any() ? new[] { size } : Enumerable.Empty<Expression>());
-            makeAddExpression = (collection, element, index) => Helpers.Method<ICollection<int>>(c => c.Add(0)).Call(
-                collection,
-                element
+            
+            // the add method itself is not actually generic, so our type inference doesn't support it yet
+            var addMethod = typeof(ICollection<>).MakeGenericType(elementType)
+                .GetMethod("Add");
+            makeAddExpression = (collection, element, index) => Expression.Call(
+                instance: collection,
+                method: addMethod,
+                arguments: element
             );
-
-            throw Throw.ShouldNeverGetHere();
         }
     }
 }

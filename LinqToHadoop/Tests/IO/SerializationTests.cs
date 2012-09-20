@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using LinqToHadoop;
 using LinqToHadoop.IO;
+using LinqToHadoop.Entities;
 
 namespace Tests.IO
 {
@@ -70,7 +71,29 @@ namespace Tests.IO
         {
             var kvp = TestDeserialize<KeyValuePair<int, int>>(50, -2);
             kvp.Key.ShouldEqual(50);
-            kvp.Value.ShouldEqual(50);
+            kvp.Value.ShouldEqual(-2);
+
+            var kvp2 = TestDeserialize<KeyValuePair<IDictionary<string, int>, Data>>(2, "a", 7, "b", 6, -1000, "c");
+            kvp2.Key.Count.ShouldEqual(2);
+            kvp2.Key["a"].ShouldEqual(7);
+            kvp2.Key["b"].ShouldEqual(6);
+            kvp2.Value.A.ShouldEqual(-1000);
+            kvp2.Value.B.ShouldEqual("c");
+            kvp2.Value.C.ShouldEqual(None.Instance);
+
+            // bulk read
+            var aLot = Enumerable.Range(0, 2000).Select(i => (i * i).WithValue(i.ToString().ToArray())).ToList();
+            var deserializer = Deserializer<KeyValuePair<int, char[]>>.ReadExpression.Compile();
+            var reader = new ListReaderWriter();
+            aLot.ForEach(kvp3 => reader.Objects.AddRange(new object[] { kvp3.Key, kvp3.Value.Length }.Concat(kvp3.Value.Cast<object>())));
+            var aLotCopy = aLot.Take(0).ToList();
+            for (int i = 0; i < aLot.Count; ++i)
+            {
+                aLotCopy.Add(deserializer(reader));
+            }
+            aLot.Zip(aLotCopy, (orig, cpy) => orig.Key == cpy.Key && new string(orig.Value) == new string(cpy.Value))
+                .All(b => b)
+                .Assert();
         }
 
         public static T TestDeserialize<T>(params object[] values)
@@ -197,6 +220,13 @@ namespace Tests.IO
 
                 return (T)value;
             }
+        }
+
+        private class Data
+        {
+            public int A { get; set; }
+            public string B { get; set; }
+            public None C { get; set; }
         }
     }
 }
