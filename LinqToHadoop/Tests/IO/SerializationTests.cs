@@ -83,7 +83,7 @@ namespace Tests.IO
             kvp2.Value.C.ShouldEqual(None.Instance);
 
             // bulk read
-            var aLot = Enumerable.Range(0, 2000).Select(i => (i * i).WithValue(i.ToString().ToArray())).ToList();
+            var aLot = Enumerable.Range(0, 10000).Select(i => (i * i).WithValue(i.ToString().ToArray())).ToList();
             var deserializer = Deserializer<KeyValuePair<int, char[]>>.ReadExpression.Compile();
             var reader = new ListReaderWriter();
             aLot.ForEach(kvp3 => reader.Objects.AddRange(new object[] { kvp3.Key, kvp3.Value.Length }.Concat(kvp3.Value.Cast<object>())));
@@ -132,6 +132,7 @@ namespace Tests.IO
 
         public class ListReaderWriter : IWriter, IReader
         {
+            private int readCount = 0;
             public readonly List<object> Objects = new List<object>();
 
             public void BeginWritingKey()
@@ -240,8 +241,8 @@ namespace Tests.IO
 
             private T Consume<T>()
             {
-                var value = this.Objects[0];
-                this.Objects.RemoveAt(0);
+                var value = this.Objects[this.readCount];
+                this.readCount++;
 
                 return (T)value;
             }

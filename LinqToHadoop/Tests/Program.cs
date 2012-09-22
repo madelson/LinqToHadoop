@@ -52,7 +52,7 @@ namespace Tests
             {
                 Console.WriteLine("All tests succeeded!");
             }
-
+                
             Console.ReadKey();
         }
     }
