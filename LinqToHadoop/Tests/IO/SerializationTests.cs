@@ -14,6 +14,7 @@ namespace Tests.IO
         {
             TestSerializer();
             TestDeserializer();
+            TestSerializerAndDeserializer();
         }
 
         public static void TestSerializer()
@@ -103,6 +104,30 @@ namespace Tests.IO
             var deserializer = Deserializer<T>.ReadExpression.Compile();
             var result = deserializer(reader);
             return result;
+        }
+
+        public static void TestSerializerAndDeserializer()
+        {
+            var res1 = TestRoundTrip(2);
+            res1.ShouldEqual(2);
+
+            var res2 = TestRoundTrip(new { a = 5, b = new { c = 6, d = "7" } });
+            res2.ShouldEqual(new { a = 5, b = new { c = 6, d = "7" } });
+
+            var tuple = Tuple.Create(7, new HashSet<int> { 1, 2 });
+            var res3 = TestRoundTrip(tuple);
+            res3.Item1.ShouldEqual(tuple.Item1);
+            res3.Item2.Except(tuple.Item2).Count().ShouldEqual(0);
+        }
+
+        public static T TestRoundTrip<T>(T value)
+        {
+            var rw = new ListReaderWriter();
+            var serializer = Serializer<T>.WriteExpression.Compile();
+            var deserializer = Deserializer<T>.ReadExpression.Compile();
+            serializer(rw, value);
+            var outValue = deserializer(rw);
+            return outValue;
         }
 
         public class ListReaderWriter : IWriter, IReader
