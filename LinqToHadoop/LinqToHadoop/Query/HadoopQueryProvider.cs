@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Text;
+using System.Reflection;
 
 namespace LinqToHadoop.Query
 {
@@ -10,12 +11,14 @@ namespace LinqToHadoop.Query
     {
         public IQueryable<TElement> CreateQuery<TElement>(Expression expression)
         {
-            throw new NotImplementedException();
+            return new HadoopQueryable<TElement>(this, expression);
         }
 
         public IQueryable CreateQuery(Expression expression)
         {
-            throw new NotImplementedException();
+            var elementType = expression.Type.GetGenericArguments(typeof(IQueryable<>)).Single();
+            var queryable = Activator.CreateInstance(typeof(HadoopQueryable<>).MakeGenericType(elementType), new object[] { expression });
+            return (IQueryable)queryable;
         }
 
         public TResult Execute<TResult>(Expression expression)

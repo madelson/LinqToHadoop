@@ -11,6 +11,14 @@ namespace LinqToHadoop.Query
     /// </summary>
     public class HadoopQueryable<T> : IQueryable<T>
     {
+        private readonly HadoopQueryProvider _provider;
+
+        public HadoopQueryable(HadoopQueryProvider provider, Expression expression) 
+        {
+            this._provider = provider;
+            this.Expression = expression;
+        }
+
         public IEnumerator<T> GetEnumerator()
         {
             throw new NotImplementedException();
@@ -21,19 +29,13 @@ namespace LinqToHadoop.Query
             return this.GetEnumerator();
         }
 
-        public Type ElementType
-        {
-            get { throw new NotImplementedException(); }
-        }
+        public Type ElementType { get { return typeof(T); } }
 
-        public Expression Expression
-        {
-            get { throw new NotImplementedException(); }
-        }
+        public Expression Expression { get; private set; }
 
         public IQueryProvider Provider
         {
-            get { throw new NotImplementedException(); }
+            get { return this._provider; }
         }
     }
 }
