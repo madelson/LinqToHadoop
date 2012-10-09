@@ -25,6 +25,11 @@ namespace LinqToHadoop
             return methodCallExpression.Method;
         }
 
+        public static MethodInfo GetMethod<T>(this T @this, Expression<Action<T>> methodCall)
+        {
+            return Method(methodCall);
+        }
+
         public static PropertyInfo Property<TProperty>(Expression<Func<TProperty>> propertyAccess)
         {
             var propertyExpression = (MemberExpression)propertyAccess.Body;
@@ -54,7 +59,7 @@ namespace LinqToHadoop
             var method = @this.IsGenericMethod
                 ? @this.MakeGenericMethodFromParameters(parametersToUse.Select(e => e.GetType()).ToList())
                 : @this;
-            var result = @this.Invoke(
+            var result = method.Invoke(
                 obj: !@this.IsStatic ? instanceOrFirstParameter : null,
                 parameters: parametersToUse.ToArray()
             );

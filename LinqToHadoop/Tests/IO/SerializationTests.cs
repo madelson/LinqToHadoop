@@ -246,6 +246,11 @@ namespace Tests.IO
 
                 return (T)value;
             }
+
+            public bool HasMoreContent
+            {
+                get { return this.Objects.Count > this.readCount; }
+            }
         }
 
         private class Data

@@ -7,6 +7,8 @@ namespace LinqToHadoop.IO
 {
     public interface IReader : IDisposable
     {
+        bool HasMoreContent { get; }
+
         void BeginReadingKey();
         void BeginReadingValue();
         int BeginReadingCollection();
