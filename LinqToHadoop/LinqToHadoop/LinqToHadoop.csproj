@@ -64,12 +64,11 @@
     <Compile Include="IO\SerializationHelpers.cs" />
     <Compile Include="IO\TextEncoding.cs" />
     <Compile Include="MapReduce\BaseMapReduceJob.cs" />
+    <Compile Include="MapReduce\Interfaces.cs" />
     <Compile Include="MapReduce\Mapper.cs" />
     <Compile Include="MapReduce\MapperBase.cs" />
     <Compile Include="MapReduce\MapReduceJob.cs" />
-    <Compile Include="MapReduce\MapReduceStream.cs" />
     <Compile Include="MapReduce\Reducer.cs" />
-    <Compile Include="MapReduce\Serialization.cs" />
     <Compile Include="Query\HadoopQueryable.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Query\HadoopQueryProvider.cs" />
